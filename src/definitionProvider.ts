@@ -157,11 +157,15 @@ export class SolidityDefinitionProvider {
         case 'Identifier':
           return this.getDeclarationForIdentifier(element.name, clickedNodeTree, contract, contracts);
         case 'MemberAccess':
+          // todo: handle super
           const reservedExpressions = ['msg', 'tx', 'block']
           if (reservedExpressions.indexOf(element.expression.name) !== -1) return;
           let resolvedExpression = this.getDeclarationGlobal(element.expression.name, clickedNodeTree, contracts);
+          if (resolvedExpression.typeName && resolvedExpression.typeName.type == 'UserDefinedTypeName') {
+            resolvedExpression = this.getDeclarationGlobal(resolvedExpression.typeName.namePath, clickedNodeTree, contracts);
+          }
           console.log(resolvedExpression);
-          return this.getDeclarationForIdentifier(element.memberName, [resolvedExpression], resolvedExpression.contract, contracts);
+          return this.getDeclarationForIdentifier(element.memberName, [resolvedExpression], resolvedExpression.contract ? resolvedExpression.contract: contract, contracts);
         case 'InheritanceSpecifier':
           let declaration = this.getContractByName(element.baseName.namePath, contracts);
           return Promise.resolve(
