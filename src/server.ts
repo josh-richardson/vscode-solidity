@@ -152,7 +152,9 @@ connection.onCompletion((textDocumentPosition: TextDocumentPositionParams): Comp
 
         const service = new CompletionService(rootPath);
         completionItems = completionItems.concat(
-                service.getAllCompletionItems(documentText,
+                service.getAllCompletionItems(
+                    textDocumentPosition,
+                    documentText,
                                              documentPath,
                                              packageDefaultDependenciesDirectory,
                                              packageDefaultDependenciesContractsDirectory));

@@ -1,9 +1,9 @@
 'use strict';
 import * as solparse from '@solidity-parser/parser';
 import {ContractCollection} from './model/contractsCollection';
-import { CompletionItem, CompletionItemKind } from 'vscode-languageserver';
+import { CompletionItem, CompletionItemKind, TextDocumentPositionParams } from 'vscode-languageserver';
 import { initialiseProject } from './projectService';
-import { SourceUnit } from '@solidity-parser/parser/dist/ast-types';
+import { getAllNodes } from './util';
 
 // TODO implement caching, dirty on document change, reload, etc.
 // store
@@ -22,29 +22,29 @@ export class CompletionService {
         this.rootPath = rootPath;
     }
 
-    public getTypeString(literal: any) {
-        const isArray = literal.array_parts.length > 0;
-        let isMapping = false;
-        const literalType = literal.literal;
-        let suffixType = '';
+    // public getTypeString(literal: any) {
+    //     const isArray = literal.array_parts.length > 0;
+    //     let isMapping = false;
+    //     const literalType = literal.literal;
+    //     let suffixType = '';
 
-        if (typeof literalType.type !== 'undefined')  {
-             isMapping = literalType.type === 'MappingExpression';
-             if (isMapping) {
-                suffixType = '(' + this.getTypeString(literalType.from) + ' => ' + this.getTypeString(literalType.to) + ')';
-            }
-        }
+    //     if (typeof literalType.type !== 'undefined')  {
+    //          isMapping = literalType.type === 'MappingExpression';
+    //          if (isMapping) {
+    //             suffixType = '(' + this.getTypeString(literalType.from) + ' => ' + this.getTypeString(literalType.to) + ')';
+    //         }
+    //     }
 
-        if (isArray) {
-            suffixType = suffixType + '[]';
-        }
+    //     if (isArray) {
+    //         suffixType = suffixType + '[]';
+    //     }
 
-        if (isMapping) {
-            return 'mapping' + suffixType;
-        }
+    //     if (isMapping) {
+    //         return 'mapping' + suffixType;
+    //     }
 
-        return literalType + suffixType;
-    }
+    //     return literalType + suffixType;
+    // }
 
     public createFunctionParamsSnippet(params: any): string {
         let paramsSnippet = '';
@@ -106,41 +106,65 @@ export class CompletionService {
         return completionItem;
     }
 
-    public getDocumentCompletionItems(documentText: string): CompletionItem[] {
+    public getDocumentCompletionItems(documentText: string, positionParams: TextDocumentPositionParams): CompletionItem[] {
         const completionItems = [];
         try {
             const result: any = solparse.parse(documentText, {range: true, loc: true});
             // console.log(JSON.stringify(result));
             // TODO struct, modifier
-            result.children.forEach(element => {
-                if (element.type === 'ContractStatement' ||  element.type === 'LibraryStatement') {
-                    const contractName = element.name;
-                    if (typeof element.body !== 'undefined' && element.body !== null) {
-                        element.body.forEach(contractElement => {
-                            if (contractElement.type === 'FunctionDeclaration') {
-                                // ignore the constructor TODO add to contract initialiasation
-                                if (contractElement.name !== contractName) {
-                                    completionItems.push(
-                                            this.createFunctionEventCompletionItem(contractElement, 'function', contractName ));
-                                }
-                            }
+            if(positionParams) {
 
-                            if (contractElement.type === 'EventDeclaration') {
-                                completionItems.push(this.createFunctionEventCompletionItem(contractElement, 'event', contractName ));
-                            }
-
-                            if (contractElement.type === 'StateVariableDeclaration') {
-                                const completionItem =  CompletionItem.create(contractElement.name);
+            } else {
+                // this is not the currently open document, we only want public members, etc
+                let contractNodes = getAllNodes(result, []);
+                let contractNode = contractNodes.filter(i => i.type === 'ContractDefinition')[0];
+                contractNodes.forEach(element => {
+                    if (element.type === 'VariableDeclaration' && element.isStateVar === true) {
+                                const completionItem =  CompletionItem.create(element.name);
                                 completionItem.kind = CompletionItemKind.Field;
-                                const typeString = this.getTypeString(contractElement.literal);
-                                completionItem.detail = '(state variable in ' + contractName + ') '
-                                                                    + typeString + ' ' + contractElement.name;
+                                console.log(element.typeName);
+                                let typeString = this.getTypeString(element.typeName);
+                                completionItem.detail = '(state variable in ' + contractNode.name + ') '
+                                                                    + typeString + ' ' + element.name;
+                                console.log(completionItem.detail);
                                 completionItems.push(completionItem);
-                            }
-                        });
+                                
                     }
-                }
-            });
+                });
+            }
+            console.log(completionItems);
+            // result.forEach(element => {
+              
+
+
+            //     if (element.type === 'ContractStatement' ||  element.type === 'LibraryStatement') {
+            //         const contractName = element.name;
+            //         if (typeof element.body !== 'undefined' && element.body !== null) {
+            //             element.body.forEach(contractElement => {
+            //                 if (contractElement.type === 'FunctionDeclaration') {
+            //                     // ignore the constructor TODO add to contract initialiasation
+            //                     if (contractElement.name !== contractName) {
+            //                         completionItems.push(
+            //                                 this.createFunctionEventCompletionItem(contractElement, 'function', contractName ));
+            //                     }
+            //                 }
+
+            //                 if (contractElement.type === 'EventDeclaration') {
+            //                     completionItems.push(this.createFunctionEventCompletionItem(contractElement, 'event', contractName ));
+            //                 }
+
+            //                 if (contractElement.type === 'StateVariableDeclaration') {
+            //                     const completionItem =  CompletionItem.create(contractElement.name);
+            //                     completionItem.kind = CompletionItemKind.Field;
+            //                     const typeString = this.getTypeString(contractElement.literal);
+            //                     completionItem.detail = '(state variable in ' + contractName + ') '
+            //                                                         + typeString + ' ' + contractElement.name;
+            //                     completionItems.push(completionItem);
+            //                 }
+            //             });
+            //         }
+            //     }
+            // });
         } catch (error) {
           // gracefule catch
           // console.log(error.message);
@@ -149,7 +173,28 @@ export class CompletionService {
         return completionItems;
     }
 
-    public getAllCompletionItems(documentText: string,
+    private getTypeString(element: any) {
+        let typeString;
+        switch (element.type) {
+            case 'Mapping':
+                typeString = "Mapping (" + this.getTypeString(element.keyType) + ' => ' + this.getTypeString(element.valueType) + ')';;
+                break;
+            case 'ElementaryTypeName':
+                typeString = element.name;
+                break;
+            case 'UserDefinedTypeName':
+                typeString = element.namePath;
+                break;
+            case 'ArrayTypeName':
+                typeString = this.getTypeString(element.baseTypeName) + '[]';
+            default:
+                break;
+        }
+        return typeString;
+    }
+
+    public getAllCompletionItems(positionParams: TextDocumentPositionParams, 
+                                documentText: string,
                                 documentPath: string,
                                 packageDefaultDependenciesDirectory: string,
                                 packageDefaultDependenciesContractsDirectory: string): CompletionItem[] {
@@ -162,12 +207,12 @@ export class CompletionService {
                 initialiseProject(this.rootPath, packageDefaultDependenciesDirectory, packageDefaultDependenciesContractsDirectory));
             let completionItems = [];
             contracts.contracts.forEach(contract => {
-                completionItems = completionItems.concat(this.getDocumentCompletionItems(contract.code));
+                completionItems = completionItems.concat(this.getDocumentCompletionItems(contract.code, null));
             });
             // console.log('total completion items' + completionItems.length);
             return completionItems;
         } else {
-            return this.getDocumentCompletionItems(documentText);
+            return this.getDocumentCompletionItems(documentText, null);
         }
     }
 }

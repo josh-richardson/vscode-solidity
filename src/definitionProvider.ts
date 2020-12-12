@@ -9,6 +9,7 @@ import { Project } from './model/project';
 import { initialiseProject } from './projectService';
 import { LocationLink, Range } from 'vscode-languageserver';
 import { TextDocument } from 'vscode-languageserver-textdocument';
+import { getAllNodes } from './util';
 
 export class SolidityDefinitionProvider {
   private rootPath: string;
@@ -38,7 +39,6 @@ export class SolidityDefinitionProvider {
     if (element instanceof Object) {
       Object.keys(element).forEach(it => {
         if (element.range && element.range[0] <= offset && offset <= element.range[1]) {
-          Object.defineProperty(element, "distance", { value: (offset - (element.range[0] + element.range[1]) / 2) });
           potentials.push(element);
         }
         if (element[it] instanceof Array && element[it][0] instanceof Object) {
@@ -53,27 +53,11 @@ export class SolidityDefinitionProvider {
     return Array.from(new Set(potentials));
   }
 
-  private getAllNodes(element: any, existing: any[]): any[] {
-    if (element instanceof Object) {
-      Object.keys(element).forEach(it => {
-        if (element.type) {
-          existing.push(element);
-        }
-        if (element[it] instanceof Array && element[it][0] instanceof Object) {
-          for (const i of element[it]) {
-            existing = existing.concat(this.getAllNodes(i, []))
-          }
-        } else if (element[it] instanceof Object) {
-          existing = existing.concat(this.getAllNodes(element[it], []))
-        }
-      });
-    }
-    return Array.from(new Set(existing));
-  }
+  
 
     private getDeclarationLocal(nameField: string, scope: any[]): any {
       for(const i of scope) {
-        let declaration = this.getAllNodes(i, []).filter(n => (n.type.endsWith("Declaration") || n.type.endsWith("Definition")) && n.name === nameField)[0]
+        let declaration = getAllNodes(i, []).filter(n => (n.type.endsWith("Declaration") || n.type.endsWith("Definition")) && n.name === nameField)[0]
         if (declaration) {
           return declaration;
         }
