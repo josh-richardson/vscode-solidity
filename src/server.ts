@@ -14,7 +14,7 @@ import {
     TextDocuments, InitializeResult,
     Files, Diagnostic,
     TextDocumentPositionParams,
-    CompletionItem, Location, SignatureHelp, TextDocumentSyncKind,
+    CompletionItem, Location, SignatureHelp, TextDocumentSyncKind, LocationLink, DefinitionLink,
 } from 'vscode-languageserver';
 
 import { TextDocument } from 'vscode-languageserver-textdocument';
@@ -46,8 +46,6 @@ const connection: IConnection = createConnection(
     new IPCMessageReader(process),
     new IPCMessageWriter(process));
 
-console.log = connection.console.log.bind(connection.console);
-console.error = connection.console.error.bind(connection.console);
 
 const documents = new TextDocuments(TextDocument);
 
@@ -106,7 +104,7 @@ function validate(document) {
 
         const diagnostics = linterDiagnostics.concat(compileErrorDiagnostics);
 
-        console.log(uri);
+        connection.console.log(uri);
         connection.sendDiagnostics({diagnostics, uri});
     } finally {
         validatingDocument = false;
@@ -173,7 +171,7 @@ connection.onCompletion((textDocumentPosition: TextDocumentPositionParams): Comp
     return completionItems;
 });
 
-connection.onDefinition((handler: TextDocumentPositionParams): Thenable<Location | Location[]> => {
+connection.onDefinition((handler: TextDocumentPositionParams): Thenable<Location | Location[] | DefinitionLink[]> => {
     const provider = new SolidityDefinitionProvider(
         rootPath,
         packageDefaultDependenciesDirectory,

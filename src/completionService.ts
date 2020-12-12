@@ -1,8 +1,9 @@
 'use strict';
-import * as solparse from 'solparse';
+import * as solparse from '@solidity-parser/parser';
 import {ContractCollection} from './model/contractsCollection';
 import { CompletionItem, CompletionItemKind } from 'vscode-languageserver';
 import { initialiseProject } from './projectService';
+import { SourceUnit } from '@solidity-parser/parser/dist/ast-types';
 
 // TODO implement caching, dirty on document change, reload, etc.
 // store
@@ -108,10 +109,10 @@ export class CompletionService {
     public getDocumentCompletionItems(documentText: string): CompletionItem[] {
         const completionItems = [];
         try {
-            const result = solparse.parse(documentText);
+            const result: any = solparse.parse(documentText, {range: true, loc: true});
             // console.log(JSON.stringify(result));
             // TODO struct, modifier
-            result.body.forEach(element => {
+            result.children.forEach(element => {
                 if (element.type === 'ContractStatement' ||  element.type === 'LibraryStatement') {
                     const contractName = element.name;
                     if (typeof element.body !== 'undefined' && element.body !== null) {
